@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -32,15 +33,14 @@ class VerifierException : Exception
 
 partial class ILImporter
 {
-    readonly MethodDesc _method;
-    readonly MethodSignature _methodSignature;
+    readonly MethodBase _method;
     readonly TypeSystemContext _typeSystemContext;
 
     readonly Type _thisType;
 
-    readonly MethodIL _methodIL;
+    readonly MethodBody _methodIL;
     readonly byte[] _ilBytes;
-    readonly LocalVariableDefinition[] _locals;
+    readonly IList<LocalVariableInfo> _locals;
 
     readonly bool _initLocals;
     readonly int _maxStack;
@@ -61,7 +61,7 @@ partial class ILImporter
 
     class ExceptionRegion
     {
-        public ILExceptionRegion ILRegion;
+        public ExceptionHandlingClause ILRegion;
     };
 
     ExceptionRegion[] _exceptionRegions;
@@ -145,13 +145,13 @@ partial class ILImporter
         return stackValue;
     }
 
-    public ILImporter(MethodDesc method, MethodIL methodIL)
+    public ILImporter(MethodBase method)
     {
-        _typeSystemContext = method.Context;
-
         // Instantiate method and its owning type
-        var instantiatedType = method.OwningType;
+        var instantiatedType = method.DeclaringType;
         var instantiatedMethod = method;
+
+        /*
         if (instantiatedType.HasInstantiation)
         {
             Instantiation genericTypeInstantiation = InstantiatedGenericParameter.CreateGenericTypeInstantiaton(instantiatedType.Instantiation);
@@ -164,14 +164,14 @@ partial class ILImporter
             Instantiation genericMethodInstantiation = InstantiatedGenericParameter.CreateGenericMethodInstantiation(
                 instantiatedType.Instantiation, instantiatedMethod.Instantiation);
             instantiatedMethod = _typeSystemContext.GetInstantiatedMethod(instantiatedMethod, genericMethodInstantiation);
-        }
+        }*/
+
         _method = instantiatedMethod;
 
-        _methodSignature = _method.Signature;
-        _methodIL = method == instantiatedMethod ? methodIL : new InstantiatedMethodIL(instantiatedMethod, methodIL);
+        _methodIL = method.GetMethodBody();
 
         // Determine this type
-        if (!_method.Signature.IsStatic)
+        if (!_method.IsStatic)
         {
             _thisType = instantiatedType;
 
@@ -182,19 +182,19 @@ partial class ILImporter
                 _thisType = _thisType.MakeByRefType();
         }
 
-        _initLocals = _methodIL.IsInitLocals;
+        _initLocals = _methodIL.InitLocals;
 
-        _maxStack = _methodIL.MaxStack;
+        _maxStack = _methodIL.MaxStackSize;
 
         _isThisInitialized = false;
-        _trackObjCtorState = !_methodSignature.IsStatic && _method.IsConstructor && !method.OwningType.IsValueType;
+        _trackObjCtorState = !_method.IsStatic && _method.IsConstructor && !method.DeclaringType.IsValueType;
 
-        _ilBytes = _methodIL.GetILBytes();
-        _locals = _methodIL.GetLocals();
+        _ilBytes = _methodIL.GetILAsByteArray();
+        _locals = _methodIL.LocalVariables;
 
-        var ilExceptionRegions = _methodIL.GetExceptionRegions();
-        _exceptionRegions = new ExceptionRegion[ilExceptionRegions.Length];
-        for (int i = 0; i < ilExceptionRegions.Length; i++)
+        var ilExceptionRegions = _methodIL.ExceptionHandlingClauses;
+        _exceptionRegions = new ExceptionRegion[ilExceptionRegions.Count];
+        for (int i = 0; i < ilExceptionRegions.Count; i++)
         {
             _exceptionRegions[i] = new ExceptionRegion() { ILRegion = ilExceptionRegions[i] };
         }
@@ -626,10 +626,10 @@ partial class ILImporter
         // If the source is within fault handler or finally handler, target shall be within the same
         if (src.HandlerIndex.HasValue && src.HandlerIndex != target.HandlerIndex)
         {
-            var regionKind = _exceptionRegions[src.HandlerIndex.Value].ILRegion.Kind;
-            if (regionKind == ILExceptionRegionKind.Fault)
+            var regionKind = _exceptionRegions[src.HandlerIndex.Value].ILRegion.Flags;
+            if (regionKind == ExceptionHandlingClauseOptions.Fault)
                 VerificationError(VerifierError.LeaveOutOfFault);
-            else if (regionKind == ILExceptionRegionKind.Finally)
+            else if (regionKind == ExceptionHandlingClauseOptions.Finally)
                 VerificationError(VerifierError.LeaveOutOfFinally);
         }
 
@@ -871,7 +871,7 @@ partial class ILImporter
                         VerificationError(VerifierError.FallthroughException);
                     else
                     {
-                        if (_exceptionRegions[src.HandlerIndex.Value].ILRegion.Kind == ILExceptionRegionKind.Finally)
+                        if (_exceptionRegions[src.HandlerIndex.Value].ILRegion.Flags == ExceptionHandlingClauseOptions.Finally)
                             VerificationError(VerifierError.BranchOutOfFinally);
                         else
                             VerificationError(VerifierError.BranchOutOfHandler);
@@ -902,7 +902,7 @@ partial class ILImporter
                             VerificationError(VerifierError.FallthroughException);
                         else
                         {
-                            if (srcRegion.Kind == ILExceptionRegionKind.Finally)
+                            if (srcRegion.Flags == ExceptionHandlingClauseOptions.Finally)
                                 VerificationError(VerifierError.BranchOutOfFinally);
                             else
                                 VerificationError(VerifierError.BranchOutOfHandler);
@@ -950,7 +950,7 @@ partial class ILImporter
     /// Checks whether the try block <paramref name="disjoint"/> is a disjoint try block relative to <paramref name="source"/>.
     /// </summary>
     /// <returns>True if <paramref name="disjoint"/> is a disjoint try block relative to <paramref name="source"/>.</returns>
-    bool IsDisjointTryBlock(ref ILExceptionRegion disjoint, ref ILExceptionRegion source)
+    bool IsDisjointTryBlock(ref ExceptionHandlingClause disjoint, ref ExceptionHandlingClause source)
     {
         if (source.TryOffset <= disjoint.TryOffset && source.TryOffset + source.TryLength >= disjoint.TryOffset + disjoint.TryLength)
         {
@@ -1000,22 +1000,25 @@ partial class ILImporter
     // For now, match PEVerify type formating to make it easy to compare with baseline
     static string TypeToStringForIsAssignable(Type type)
     {
-        switch (type.Category)
+        switch (Type.GetTypeCode(type))
         {
-            case TypeFlags.Boolean: return "Boolean";
-            case TypeFlags.Char: return "Char";
-            case TypeFlags.SByte:
-            case TypeFlags.Byte: return "Byte";
-            case TypeFlags.Int16:
-            case TypeFlags.UInt16: return "Short";
-            case TypeFlags.Int32:
-            case TypeFlags.UInt32: return "Int32";
-            case TypeFlags.Int64:
-            case TypeFlags.UInt64: return "Long";
-            case TypeFlags.Single: return "Single";
-            case TypeFlags.Double: return "Double";
-            case TypeFlags.IntPtr:
-            case TypeFlags.UIntPtr: return "Native Int";
+            case TypeCode.Boolean: return "Boolean";
+            case TypeCode.Char: return "Char";
+            case TypeCode.SByte:
+            case TypeCode.Byte: return "Byte";
+            case TypeCode.Int16:
+            case TypeCode.UInt16: return "Short";
+            case TypeCode.Int32:
+            case TypeCode.UInt32: return "Int32";
+            case TypeCode.Int64:
+            case TypeCode.UInt64: return "Long";
+            case TypeCode.Single: return "Single";
+            case TypeCode.Double: return "Double";
+            default:
+                if (type == typeof(IntPtr)
+                    || type == typeof(UIntPtr))
+                    return "Native Int";
+                break;
         }
 
         return StackValue.CreateFromType(type).ToString();
@@ -1099,7 +1102,7 @@ partial class ILImporter
                 // See "Rules for non-virtual call to a non-final virtual method" in ImportCall
                 if (ftn.Method.IsVirtual && !ftn.Method.IsFinal && !obj.IsBoxedValueType)
                 {
-                    var methodTypeDef = ftn.Method.OwningType.GetTypeDefinition() as MetadataType; // Method is always considered final if owning type is sealed
+                    var methodTypeDef = ftn.Method.DeclaringType; // Method is always considered final if owning type is sealed
                     if (methodTypeDef == null || !methodTypeDef.IsSealed)
                         Check(obj.IsThisPtr && !_modifiesThisPtr, VerifierError.LdftnNonFinalVirtual);
                 }
@@ -1118,34 +1121,36 @@ partial class ILImporter
             VerificationError(VerifierError.DelegatePattern);
     }
 
-    bool IsDelegateAssignable(MethodDesc targetMethod, Type delegateType, Type firstArg)
+    bool IsDelegateAssignable(MethodBase targetMethod, Type delegateType, Type firstArg)
     {
         var invokeMethod = delegateType.GetMethod("Invoke", null);
         if (invokeMethod == null)
             return false;
 
-        var targetSignature = targetMethod.Signature;
-        var invokeSignature = invokeMethod.Signature;
-
         // Compare calling convention ignoring distinction between static and instance
-        if ((targetSignature.Flags & ~MethodSignatureFlags.Static) != (invokeSignature.Flags & ~MethodSignatureFlags.Static))
+        if ((targetMethod.CallingConvention & ~CallingConventions.HasThis) != (invokeMethod.CallingConvention & ~CallingConventions.HasThis))
             return false;
 
+        var targetReturnType = targetMethod is MethodInfo ? ((MethodInfo)targetMethod).ReturnType : typeof(void);
+        
         // Compare return type
-        if (!IsAssignable(targetSignature.ReturnType, invokeSignature.ReturnType))
+        if (!IsAssignable(targetReturnType, invokeMethod.ReturnType))
             return false;
 
-        int totalTargetArgs = targetSignature.Length + (targetSignature.IsStatic ? 0 : 1);
+        var targetParameters = targetMethod.GetParameters();
+        int totalTargetArgs = targetParameters.Length + (targetMethod.IsStatic ? 0 : 1);
+
+        var invokeParameters = invokeMethod.GetParameters();
 
         // Compare signature parameters
 
         bool isOpenDelegate;
-        if (totalTargetArgs == invokeSignature.Length)
+        if (totalTargetArgs == invokeParameters.Length)
         {
             // All arguments provided by invoke, delegate must be open.
             isOpenDelegate = true;
         }
-        else if (totalTargetArgs == invokeSignature.Length + 1)
+        else if (totalTargetArgs == invokeParameters.Length + 1)
         {
             // One too few arguments provided by invoke, delegate must be closed.
             isOpenDelegate = false;
@@ -1171,7 +1176,7 @@ partial class ILImporter
             if (firstArg != null)
                 return false;
 
-            firstInvokeArg = invokeSignature[0];
+            firstInvokeArg = invokeParameters[0].ParameterType;
             consumedArgs++;
         }
         else
@@ -1184,19 +1189,19 @@ partial class ILImporter
         }
 
         Type firstTargetArg;
-        if (targetSignature.IsStatic)
+        if (targetMethod.IsStatic)
         {
             // Checked above
-            Debug.Assert(targetSignature.Length != 0);
+            Debug.Assert(targetParameters.Length != 0);
 
             // The first argument for a static method is the first fixed arg.
-            firstTargetArg = targetSignature[0];
+            firstTargetArg = targetParameters[0].ParameterType;
             consumedArgs--;
         }
         else
         {
             // The type of the first argument to an instance method is from the method type.
-            firstTargetArg = targetMethod.OwningType;
+            firstTargetArg = targetMethod.DeclaringType;
 
             // If the delegate is open and the target method is on a value type or primitive then the first argument of the invoke
             // method must be a reference to that type. So make the type we got from the reference to a ref. (We don't need to
@@ -1210,12 +1215,12 @@ partial class ILImporter
             return false;
 
         // We better have same number of remaining args
-        if (invokeSignature.Length - consumedArgs != targetSignature.Length)
+        if (invokeParameters.Length - consumedArgs != targetParameters.Length)
             return false;
 
-        for (int i = isOpenDelegate ? 1 : 0; i < invokeSignature.Length; i++)
+        for (int i = isOpenDelegate ? 1 : 0; i < invokeParameters.Length; i++)
         {
-            if (!IsAssignable(invokeSignature[i], targetSignature[i - consumedArgs]))
+            if (!IsAssignable(invokeParameters[i].ParameterType, targetParameters[i - consumedArgs].ParameterType))
                 return false;
         }
 
@@ -1236,11 +1241,6 @@ partial class ILImporter
         VerificationError(VerifierError.Unverifiable);
     }
 
-    Type GetWellKnownType(WellKnownType wellKnownType)
-    {
-        return _typeSystemContext.GetWellKnownType(wellKnownType);
-    }
-
     void HandleTokenResolveException(int token)
     {
         var args = new ErrorArgument[]
@@ -1252,12 +1252,12 @@ partial class ILImporter
         AbortBasicBlockVerification();
     }
 
-    Object ResolveToken(int token)
+    MemberInfo ResolveToken(int token)
     {
-        Object tokenObj = null;
+        MemberInfo tokenObj = null;
         try
         {
-            tokenObj = _methodIL.GetObject(token);
+            tokenObj = _method.Module.ResolveMember(token);
         }
         catch (BadImageFormatException)
         {
@@ -1272,23 +1272,23 @@ partial class ILImporter
 
     Type ResolveTypeToken(int token)
     {
-        object tokenObj = ResolveToken(token);
+        MemberInfo tokenObj = ResolveToken(token);
         FatalCheck(tokenObj is Type, VerifierError.ExpectedTypeToken);
         return (Type)tokenObj;
     }
 
-    FieldDesc ResolveFieldToken(int token)
+    FieldInfo ResolveFieldToken(int token)
     {
-        object tokenObj = ResolveToken(token);
-        FatalCheck(tokenObj is FieldDesc, VerifierError.ExpectedFieldToken);
-        return (FieldDesc)tokenObj;
+        MemberInfo tokenObj = ResolveToken(token);
+        FatalCheck(tokenObj is FieldInfo, VerifierError.ExpectedFieldToken);
+        return (FieldInfo)tokenObj;
     }
 
-    MethodDesc ResolveMethodToken(int token)
+    MethodBase ResolveMethodToken(int token)
     {
-        object tokenObj = ResolveToken(token);
-        FatalCheck(tokenObj is MethodDesc, VerifierError.ExpectedMethodToken);
-        return (MethodDesc)tokenObj;
+        MemberInfo tokenObj = ResolveToken(token);
+        FatalCheck(tokenObj is MethodBase, VerifierError.ExpectedMethodToken);
+        return (MethodBase)tokenObj;
     }
 
     void MarkInstructionBoundary()
@@ -1323,7 +1323,7 @@ partial class ILImporter
                 if (basicBlock.StartOffset != r.ILRegion.TryOffset)
                     continue;
 
-                if (r.ILRegion.Kind == ILExceptionRegionKind.Filter)
+                if (r.ILRegion.Flags == ExceptionHandlingClauseOptions.Filter)
                 {
                     var filterBlock = _basicBlocks[r.ILRegion.FilterOffset];
                     PropagateThisState(basicBlock, filterBlock);
@@ -1353,7 +1353,7 @@ partial class ILImporter
                 return;
             }
 
-            if (r.ILRegion.Kind == ILExceptionRegionKind.Filter || r.ILRegion.Kind == ILExceptionRegionKind.Catch)
+            if (r.ILRegion.Flags == ExceptionHandlingClauseOptions.Filter || r.ILRegion.Flags == ExceptionHandlingClauseOptions.Clause)
             {
                 // stack must uninit or 1 (exception object)
                 Check(basicBlock.EntryStack == null || basicBlock.EntryStack.Length == 1, VerifierError.FilterOrCatchUnexpectedStack);
@@ -1361,20 +1361,20 @@ partial class ILImporter
                 if (basicBlock.EntryStack == null)
                     basicBlock.EntryStack = new StackValue[1];
 
-                if (r.ILRegion.Kind == ILExceptionRegionKind.Filter)
+                if (r.ILRegion.Flags == ExceptionHandlingClauseOptions.Filter)
                 {
-                    basicBlock.EntryStack[0] = StackValue.CreateObjRef(GetWellKnownType(WellKnownType.Object));
+                    basicBlock.EntryStack[0] = StackValue.CreateObjRef(typeof(object));
                 }
                 else
-                if (r.ILRegion.Kind == ILExceptionRegionKind.Catch)
+                if (r.ILRegion.Flags == ExceptionHandlingClauseOptions.Clause)
                 {
-                    var exceptionType = ResolveTypeToken(r.ILRegion.ClassToken);
+                    var exceptionType = r.ILRegion.CatchType;
                     Check(!exceptionType.IsByRef, VerifierError.CatchByRef);
                     basicBlock.EntryStack[0] = StackValue.CreateObjRef(exceptionType);
 
-                    if (SanityChecks && basicBlock.EntryStack[0] != StackValue.CreateObjRef(GetWellKnownType(WellKnownType.Object)))
+                    if (SanityChecks && basicBlock.EntryStack[0] != StackValue.CreateObjRef(typeof(object)))
                     {
-                        CheckIsAssignable(basicBlock.EntryStack[0], StackValue.CreateObjRef(GetWellKnownType(WellKnownType.Exception)),
+                        CheckIsAssignable(basicBlock.EntryStack[0], StackValue.CreateObjRef(typeof(Exception)),
                             VerifierError.ThrowOrCatchOnlyExceptionType);
                     }
                 }
@@ -1440,8 +1440,8 @@ partial class ILImporter
         }
         else
         {
-            FatalCheck(index < _locals.Length, VerifierError.UnrecognizedLocalNumber);
-            return _locals[index].Type;
+            FatalCheck(index < _locals.Count, VerifierError.UnrecognizedLocalNumber);
+            return _locals[index].LocalType;
         }
     }
 
@@ -1528,7 +1528,7 @@ partial class ILImporter
 
         CheckIsObjRef(value);
 
-        Check(_method.OwningType.CanAccess(type), VerifierError.TypeAccess);
+        Check(_method.DeclaringType.CanAccess(type), VerifierError.TypeAccess);
 
         Push(StackValue.CreateObjRef(type));
     }
@@ -1559,11 +1559,11 @@ partial class ILImporter
         // if (sig.isVarArg())
         //      eeGetCallSiteSig(memberRef, getCurrentModuleHandle(), getCurrentContext(), &sig, false);
 
-        MethodDesc method = ResolveMethodToken(token);
+        MethodBase method = ResolveMethodToken(token);
 
         MethodSignature sig = method.Signature;
 
-        Type methodType = sig.IsStatic ? null : method.OwningType;
+        Type methodType = sig.IsStatic ? null : method.DeclaringType;
 
         if (opcode == ILOpcode.callvirt)
         {
@@ -1577,7 +1577,7 @@ partial class ILImporter
                 Check(!ecmaMethod.IsAbstract, VerifierError.CallAbstract);
         }
 
-        if (opcode == ILOpcode.newobj && methodType.IsDelegate)
+        if (opcode == ILOpcode.newobj && methodType.IsAssignableTo(typeof(Delegate)))
         {
             Check(sig.Length == 2, VerifierError.DelegateCtor);
             var declaredObj = StackValue.CreateFromType(sig[0]);
@@ -2208,7 +2208,7 @@ partial class ILImporter
         }
         else
         {
-            var owningType = field.OwningType;
+            var owningType = field.DeclaringType;
 
             // Note that even if the field is static, we require that the this pointer
             // satisfy the same constraints as a non-static field  This happens to
@@ -2225,14 +2225,14 @@ partial class ILImporter
             instance = actualThis.Type;
 
             if (field.IsInitOnly)
-                Check(field.OwningType == _method.OwningType && actualThis.IsThisPtr &&
-                    (_method.IsConstructor || HasIsExternalInit(_method.Signature)), VerifierError.InitOnly);
+                Check(field.DeclaringType == _method.DeclaringType && actualThis.IsThisPtr &&
+                    (_method.IsConstructor || HasIsExternalInit(_method)), VerifierError.InitOnly);
         }
 
         // Check any constraints on the fields' class --- accessing the field might cause a class constructor to run.
         Check(field.OwningType.CheckConstraints(), VerifierError.UnsatisfiedFieldParentInst);
 
-        Check(_method.OwningType.CanAccess(field, instance), VerifierError.FieldAccess);
+        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
 
         CheckIsAssignable(value, StackValue.CreateFromType(field.FieldType));
     }
@@ -2295,9 +2295,9 @@ partial class ILImporter
 
         CheckIsObjRef(value);
 
-        if (SanityChecks && value != StackValue.CreateObjRef(GetWellKnownType(WellKnownType.Object)))
+        if (SanityChecks && value != StackValue.CreateObjRef(typeof(object)))
         {
-            CheckIsAssignable(value, StackValue.CreateFromType(GetWellKnownType(WellKnownType.Exception)),
+            CheckIsAssignable(value, StackValue.CreateFromType(typeof(Exception)),
                 VerifierError.ThrowOrCatchOnlyExceptionType);
         }
 
@@ -2306,8 +2306,8 @@ partial class ILImporter
 
     void ImportLoadString(int token)
     {
-        object tokenObj = _methodIL.GetObject(token);
-        Check(tokenObj is String, VerifierError.StringOperand);
+        string tokenObj = _method.Module.ResolveString(token);
+        Check(tokenObj is not null, VerifierError.StringOperand);
 
         Push(StackValue.CreateObjRef(typeof(string)));
     }
@@ -2367,8 +2367,8 @@ partial class ILImporter
     void ImportEndFinally()
     {
         Check(_currentBasicBlock.HandlerIndex.HasValue, VerifierError.Endfinally);
-        Check(_exceptionRegions[_currentBasicBlock.HandlerIndex.Value].ILRegion.Kind == ILExceptionRegionKind.Finally ||
-            _exceptionRegions[_currentBasicBlock.HandlerIndex.Value].ILRegion.Kind == ILExceptionRegionKind.Fault, VerifierError.Endfinally);
+        Check(_exceptionRegions[_currentBasicBlock.HandlerIndex.Value].ILRegion.Flags == ExceptionHandlingClauseOptions.Finally ||
+            _exceptionRegions[_currentBasicBlock.HandlerIndex.Value].ILRegion.Flags == ExceptionHandlingClauseOptions.Fault, VerifierError.Endfinally);
 
         EmptyTheStack();
     }
@@ -2634,13 +2634,13 @@ partial class ILImporter
             var eR = _exceptionRegions[_currentBasicBlock.HandlerIndex.Value].ILRegion;
 
             //in case a simple catch
-            if (eR.Kind == ILExceptionRegionKind.Catch)
+            if (eR.Flags == ExceptionHandlingClauseOptions.Clause)
             {
                 return;
             }
 
             //in case a filter make sure rethrow is within the handler
-            if (eR.Kind == ILExceptionRegionKind.Filter &&
+            if (eR.Flags == ExceptionHandlingClauseOptions.Filter &&
                 _currentOffset >= eR.HandlerOffset &&
                 _currentOffset <= eR.HandlerOffset + eR.HandlerLength)
             {
@@ -2717,15 +2717,13 @@ partial class ILImporter
         Check((mask & Prefix.Constrained) == 0, VerifierError.Constrained);
     }
 
-    static bool HasIsExternalInit(MethodSignature signature)
+    static bool HasIsExternalInit(MethodBase method)
     {
-        if (signature.HasEmbeddedSignatureData)
+        if (method is MethodInfo info)
         {
-            foreach (var data in signature.GetEmbeddedSignatureData())
+            if (info.ReturnParameter.GetCustomAttribute(typeof(System.Runtime.CompilerServices.IsExternalInit), false) is not null)
             {
-                if (data.type is MetadataType mdType && mdType.Namespace == "System.Runtime.CompilerServices" && mdType.Name == "IsExternalInit" &&
-                    data.index == MethodSignature.IndexOfCustomModifiersOnReturnType)
-                    return true;
+                return true;
             }
         }
 

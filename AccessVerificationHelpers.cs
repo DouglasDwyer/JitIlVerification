@@ -55,7 +55,7 @@ namespace JitIlVerification
         /// Returns whether the class '<paramref name="currentClass"/>' can access the method '<paramref name="targetMethod"/>' through
         /// the instance '<paramref name="instance"/>'. The instance can be null, if the method to be accessed is static.
         /// </summary>
-        internal static bool CanAccess(this TypeDesc currentType, MethodDesc targetMethod, TypeDesc instance = null)
+        internal static bool CanAccess(this Type currentType, MethodBase targetMethod, Type instance = null)
         {
             // If generic method, check instantiation access
             if (targetMethod.HasInstantiation && !currentType.CanAccessInstantiation(targetMethod.Instantiation))
@@ -77,7 +77,7 @@ namespace JitIlVerification
         /// Returns whether the class '<paramref name="currentClass"/>' can access the field '<paramref name="targetField"/>' through
         /// the instance '<paramref name="instance"/>'. The instance can be null, if the field to be accessed is static.
         /// </summary>
-        internal static bool CanAccess(this TypeDesc currentType, FieldDesc targetField, TypeDesc instance = null)
+        internal static bool CanAccess(this Type currentType, FieldInfo targetField, Type instance = null)
         {
             // Check access to field owning type
             var targetFieldDef = (EcmaField)targetField.GetTypicalFieldDefinition();
@@ -92,7 +92,7 @@ namespace JitIlVerification
             return currentType.CanAccess(targetField.FieldType);
         }
 
-        private static bool CanAccessMember(this MetadataType currentType, TypeDesc targetType, MethodAttributes memberVisibility, TypeDesc instance)
+        private static bool CanAccessMember(this Type currentType, Type targetType, MethodAttributes memberVisibility, Type instance)
         {
             if (instance == null)
                 instance = currentType;

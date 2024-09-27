@@ -706,25 +706,25 @@ internal sealed partial class ILImporter
                     ImportLoadElement(null);
                     break;
                 case ILOpcode.stelem_i:
-                    ImportStoreElement(WellKnownType.IntPtr);
+                    ImportStoreElement(typeof(IntPtr));
                     break;
                 case ILOpcode.stelem_i1:
-                    ImportStoreElement(WellKnownType.SByte);
+                    ImportStoreElement(typeof(sbyte));
                     break;
                 case ILOpcode.stelem_i2:
-                    ImportStoreElement(WellKnownType.Int16);
+                    ImportStoreElement(typeof(short));
                     break;
                 case ILOpcode.stelem_i4:
-                    ImportStoreElement(WellKnownType.Int32);
+                    ImportStoreElement(typeof(int));
                     break;
                 case ILOpcode.stelem_i8:
-                    ImportStoreElement(WellKnownType.Int64);
+                    ImportStoreElement(typeof(long));
                     break;
                 case ILOpcode.stelem_r4:
-                    ImportStoreElement(WellKnownType.Single);
+                    ImportStoreElement(typeof(float));
                     break;
                 case ILOpcode.stelem_r8:
-                    ImportStoreElement(WellKnownType.Double);
+                    ImportStoreElement(typeof(double));
                     break;
                 case ILOpcode.stelem_ref:
                     ImportStoreElement(null);
@@ -739,28 +739,28 @@ internal sealed partial class ILImporter
                     ImportUnbox(ReadILToken(), opCode);
                     break;
                 case ILOpcode.conv_ovf_i1:
-                    ImportConvert(WellKnownType.SByte, true, false);
+                    ImportConvert(typeof(sbyte), true, false);
                     break;
                 case ILOpcode.conv_ovf_u1:
-                    ImportConvert(WellKnownType.Byte, true, true);
+                    ImportConvert(typeof(byte), true, true);
                     break;
                 case ILOpcode.conv_ovf_i2:
-                    ImportConvert(WellKnownType.Int16, true, false);
+                    ImportConvert(typeof(short), true, false);
                     break;
                 case ILOpcode.conv_ovf_u2:
-                    ImportConvert(WellKnownType.UInt16, true, true);
+                    ImportConvert(typeof(ushort), true, true);
                     break;
                 case ILOpcode.conv_ovf_i4:
-                    ImportConvert(WellKnownType.Int32, true, false);
+                    ImportConvert(typeof(int), true, false);
                     break;
                 case ILOpcode.conv_ovf_u4:
-                    ImportConvert(WellKnownType.UInt32, true, true);
+                    ImportConvert(typeof(uint), true, true);
                     break;
                 case ILOpcode.conv_ovf_i8:
-                    ImportConvert(WellKnownType.Int64, true, false);
+                    ImportConvert(typeof(long), true, false);
                     break;
                 case ILOpcode.conv_ovf_u8:
-                    ImportConvert(WellKnownType.UInt64, true, true);
+                    ImportConvert(typeof(ulong), true, true);
                     break;
                 case ILOpcode.refanyval:
                     ImportRefAnyVal(ReadILToken());
@@ -775,19 +775,19 @@ internal sealed partial class ILImporter
                     ImportLdToken(ReadILToken());
                     break;
                 case ILOpcode.conv_u2:
-                    ImportConvert(WellKnownType.UInt16, false, true);
+                    ImportConvert(typeof(ushort), false, true);
                     break;
                 case ILOpcode.conv_u1:
-                    ImportConvert(WellKnownType.Byte, false, true);
+                    ImportConvert(typeof(byte), false, true);
                     break;
                 case ILOpcode.conv_i:
-                    ImportConvert(WellKnownType.IntPtr, false, false);
+                    ImportConvert(typeof(IntPtr), false, false);
                     break;
                 case ILOpcode.conv_ovf_i:
-                    ImportConvert(WellKnownType.IntPtr, true, false);
+                    ImportConvert(typeof(IntPtr), true, false);
                     break;
                 case ILOpcode.conv_ovf_u:
-                    ImportConvert(WellKnownType.UIntPtr, true, true);
+                    ImportConvert(typeof(UIntPtr), true, true);
                     break;
                 case ILOpcode.add_ovf:
                 case ILOpcode.add_ovf_un:
@@ -816,10 +816,10 @@ internal sealed partial class ILImporter
                     EndImportingInstruction();
                     return;
                 case ILOpcode.stind_i:
-                    ImportStoreIndirect(WellKnownType.IntPtr);
+                    ImportStoreIndirect(typeof(IntPtr));
                     break;
                 case ILOpcode.conv_u:
-                    ImportConvert(WellKnownType.UIntPtr, false, true);
+                    ImportConvert(typeof(UIntPtr), false, true);
                     break;
                 case ILOpcode.arglist:
                     ImportArgList();
@@ -919,25 +919,5 @@ internal sealed partial class ILImporter
                 return;
             }
         }
-    }
-
-    private void ImportLoadIndirect(WellKnownType wellKnownType)
-    {
-        ImportLoadIndirect(GetWellKnownType(wellKnownType));
-    }
-
-    private void ImportStoreIndirect(WellKnownType wellKnownType)
-    {
-        ImportStoreIndirect(GetWellKnownType(wellKnownType));
-    }
-
-    private void ImportLoadElement(WellKnownType wellKnownType)
-    {
-        ImportLoadElement(GetWellKnownType(wellKnownType));
-    }
-
-    private void ImportStoreElement(WellKnownType wellKnownType)
-    {
-        ImportStoreElement(GetWellKnownType(wellKnownType));
     }
 }

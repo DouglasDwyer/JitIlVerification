@@ -536,7 +536,7 @@ partial class ILImporter
         }
     }
 
-    bool IsBinaryComparable(StackValue src, StackValue dst, OpCode op)
+    bool IsBinaryComparable(StackValue src, StackValue dst, ILOpcode op)
     {
         if (src.Kind == dst.Kind && src.Type == dst.Type)
             return true;
@@ -551,9 +551,9 @@ partial class ILImporter
                         // __cgt.un__ is allowed and verifiable on ObjectRefs (O). This is commonly used when
                         // comparing an ObjectRef with null(there is no "compare - not - equal" instruction, which
                         // would otherwise be a more obvious solution)
-                        return op == OpCodes.Beq || op == OpCodes.Beq_S ||
-                        op == OpCodes.Bne_Un || op == OpCodes.Bne_Un_S ||
-                               op == OpCodes.Ceq || op == OpCodes.Cgt_Un;
+                        return op == ILOpcode.beq || op == ILOpcode.beq_s ||
+                        op == ILOpcode.bne_un || op == ILOpcode.bne_un_s ||
+                               op == ILOpcode.ceq || op == ILOpcode.cgt_un;
                     default:
                         return false;
                 }
@@ -567,9 +567,9 @@ partial class ILImporter
                     case StackValueKind.ByRef:
                         return true;
                     case StackValueKind.NativeInt:
-                        return op == OpCodes.Beq || op == OpCodes.Beq_S ||
-                        op == OpCodes.Bne_Un || op == OpCodes.Bne_Un_S ||
-                               op == OpCodes.Ceq;
+                        return op == ILOpcode.beq || op == ILOpcode.beq_s ||
+                        op == ILOpcode.bne_un || op == ILOpcode.bne_un_s ||
+                               op == ILOpcode.ceq;
                     default:
                         return false;
                 }
@@ -587,9 +587,9 @@ partial class ILImporter
                     case StackValueKind.NativeInt:
                         return true;
                     case StackValueKind.ByRef:
-                        return op == OpCodes.Beq || op == OpCodes.Beq_S ||
-                        op == OpCodes.Bne_Un || op == OpCodes.Bne_Un_S ||
-                               op == OpCodes.Ceq;
+                        return op == ILOpcode.beq || op == ILOpcode.beq_s ||
+                        op == ILOpcode.bne_un || op == ILOpcode.bne_un_s ||
+                               op == ILOpcode.ceq;
                     default:
                         return false;
                 }
