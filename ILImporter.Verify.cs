@@ -34,7 +34,7 @@ class VerifierException : Exception
 partial class ILImporter
 {
     readonly MethodBase _method;
-    readonly TypeSystemContext _typeSystemContext;
+    readonly ParameterInfo[] _methodParameters;
 
     readonly Type _thisType;
 
@@ -182,6 +182,7 @@ partial class ILImporter
                 _thisType = _thisType.MakeByRefType();
         }
 
+        _methodParameters = _method.GetParameters();
         _initLocals = _methodIL.InitLocals;
 
         _maxStack = _methodIL.MaxStackSize;
@@ -1435,8 +1436,8 @@ partial class ILImporter
                     return _thisType;
                 index--;
             }
-            FatalCheck(index < _methodSignature.Length, VerifierError.UnrecognizedArgumentNumber);
-            return _methodSignature[index];
+            FatalCheck(index < _methodParameters.Length, VerifierError.UnrecognizedArgumentNumber);
+            return _methodParameters[index].ParameterType;
         }
         else
         {
@@ -1560,10 +1561,8 @@ partial class ILImporter
         //      eeGetCallSiteSig(memberRef, getCurrentModuleHandle(), getCurrentContext(), &sig, false);
 
         MethodBase method = ResolveMethodToken(token);
-
-        MethodSignature sig = method.Signature;
-
-        Type methodType = sig.IsStatic ? null : method.DeclaringType;
+        ParameterInfo[] parameters = method.GetParameters();
+        Type methodType = method.IsStatic ? null : method.DeclaringType;
 
         if (opcode == ILOpcode.callvirt)
         {
@@ -1579,9 +1578,9 @@ partial class ILImporter
 
         if (opcode == ILOpcode.newobj && methodType.IsAssignableTo(typeof(Delegate)))
         {
-            Check(sig.Length == 2, VerifierError.DelegateCtor);
-            var declaredObj = StackValue.CreateFromType(sig[0]);
-            var declaredFtn = StackValue.CreateFromType(sig[1]);
+            Check(parameters.Length == 2, VerifierError.DelegateCtor);
+            var declaredObj = StackValue.CreateFromType(parameters[0].ParameterType);
+            var declaredFtn = StackValue.CreateFromType(parameters[1].ParameterType);
 
             Check(declaredFtn.Kind == StackValueKind.NativeInt, VerifierError.DelegateCtorSigI, declaredFtn);
 
@@ -1600,10 +1599,10 @@ partial class ILImporter
         }
         else
         {
-            for (int i = sig.Length - 1; i >= 0; i--)
+            for (int i = parameters.Length - 1; i >= 0; i--)
             {
                 var actual = Pop(allowUninitThis: true);
-                var declared = StackValue.CreateFromType(sig[i]);
+                var declared = StackValue.CreateFromType(parameters[i].ParameterType);
 
                 CheckIsAssignable(actual, declared);
 
@@ -1618,7 +1617,7 @@ partial class ILImporter
         if (opcode == ILOpcode.newobj)
         {
             Check(method.IsConstructor, VerifierError.CtorExpected);
-            if (sig.IsStatic || methodType == null || method.IsAbstract)
+            if (method.IsStatic || methodType == null || method.IsAbstract)
             {
                 VerificationError(VerifierError.CtorSig);
             }
@@ -1626,13 +1625,11 @@ partial class ILImporter
             {
                 if (methodType.IsArray)
                 {
-                    var arrayType = (ArrayType)methodType;
-                    Check(!IsByRefLike(StackValue.CreateFromType(arrayType.ElementType)), VerifierError.ArrayByRef);
+                    Check(!IsByRefLike(StackValue.CreateFromType(methodType.GetElementType())), VerifierError.ArrayByRef);
                 }
                 else
                 {
-                    var metadataType = (MetadataType)methodType;
-                    Check(!metadataType.IsAbstract, VerifierError.NewobjAbstractClass);
+                    Check(!methodType.IsAbstract, VerifierError.NewobjAbstractClass);
                 }
             }
         }
@@ -1700,7 +1697,7 @@ partial class ILImporter
                 // harder and more error prone.
                 if (method.IsVirtual && !method.IsFinal && !actualThis.IsBoxedValueType)
                 {
-                    var methodTypeDef = methodType.GetTypeDefinition() as MetadataType; // Method is always considered final if owning type is sealed
+                    var methodTypeDef = methodType.DeclaringType; // Method is always considered final if owning type is sealed
                     if (methodTypeDef == null || !methodTypeDef.IsSealed)
                         Check(actualThis.IsThisPtr && !_modifiesThisPtr, VerifierError.ThisMismatch);
                 }
@@ -1718,23 +1715,23 @@ partial class ILImporter
         }
 
         // Check any constraints on the callee's class and type parameters
-        if (!method.OwningType.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.OwningType);
+        if (!method.DeclaringType.CheckConstraints())
+            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.DeclaringType);
         else if (!method.CheckConstraints())
             VerificationError(VerifierError.UnsatisfiedMethodInst, method);
 
-        Check(_method.OwningType.CanAccess(method, instance), VerifierError.MethodAccess);
+        Check(_method.DeclaringType.CanAccess(method, instance), VerifierError.MethodAccess);
 
-        Type returnType = sig.ReturnType;
+        Type returnType = method is MethodInfo ? ((MethodInfo)method).ReturnType : typeof(void);
 
         // special checks for tailcalls
         if (tailCall)
         {
-            Type callerReturnType = _methodSignature.ReturnType;
+            Type callerReturnType = _method is MethodInfo ? ((MethodInfo)_method).ReturnType : typeof(void);
 
-            if (returnType.IsVoid || callerReturnType.IsVoid)
+            if (returnType == typeof(void) || callerReturnType == typeof(void))
             {
-                Check(returnType.IsVoid && callerReturnType.IsVoid, VerifierError.TailRetVoid);
+                Check(returnType == typeof(void) && callerReturnType == typeof(void), VerifierError.TailRetVoid);
             }
             // else
             // if (returnType.IsValueType || callerReturnType.IsValueType)
@@ -1761,7 +1758,7 @@ partial class ILImporter
             Push(StackValue.CreateFromType(methodType));
         }
         else
-        if (!returnType.IsVoid)
+        if (returnType != typeof(void))
         {
             var returnValue = StackValue.CreateFromType(returnType);
 
@@ -1770,7 +1767,7 @@ partial class ILImporter
             // so we can trust that only the Address operation returns a byref.
             if (HasPendingPrefix(Prefix.ReadOnly))
             {
-                if (method.OwningType.IsArray && sig.ReturnType.IsByRef)
+                if (method.DeclaringType.IsArray && returnType.IsByRef)
                     returnValue.SetIsReadOnly();
                 else
                     VerificationError(VerifierError.ReadonlyUnexpectedCallee);
@@ -1792,7 +1789,7 @@ partial class ILImporter
 
     void ImportLdFtn(int token, ILOpcode opCode)
     {
-        MethodDesc method = ResolveMethodToken(token);
+        MethodBase method = ResolveMethodToken(token);
         Check(!method.IsConstructor, VerifierError.LdftnCtor);
 
 #if false
@@ -1810,16 +1807,16 @@ partial class ILImporter
         }
         else if (opCode == ILOpcode.ldvirtftn)
         {
-            Check(!method.Signature.IsStatic, VerifierError.LdvirtftnOnStatic);
+            Check(!method.IsStatic, VerifierError.LdvirtftnOnStatic);
 
             StackValue declaredType;
-            if (method.OwningType.IsValueType)
+            if (method.DeclaringType.IsValueType)
             {
                 // Box value type for comparison
-                declaredType = StackValue.CreateObjRef(method.OwningType);
+                declaredType = StackValue.CreateObjRef(method.DeclaringType);
             }
             else
-                declaredType = StackValue.CreateFromType(method.OwningType);
+                declaredType = StackValue.CreateFromType(method.DeclaringType);
 
             var thisPtr = Pop();
             instance = thisPtr.Type;
@@ -1834,12 +1831,12 @@ partial class ILImporter
         }
 
         // Check any constraints on the callee's class and type parameters
-        if (!method.OwningType.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.OwningType);
+        if (!method.DeclaringType.CheckConstraints())
+            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.DeclaringType);
         else if (!method.CheckConstraints())
             VerificationError(VerifierError.UnsatisfiedMethodInst, method);
 
-        Check(_method.OwningType.CanAccess(method, instance), VerifierError.MethodAccess);
+        Check(_method.DeclaringType.CanAccess(method, instance), VerifierError.MethodAccess);
 
         Push(StackValue.CreateMethod(method));
     }
@@ -1870,9 +1867,9 @@ partial class ILImporter
         Check(_currentBasicBlock.TryIndex == null, VerifierError.ReturnFromTry);
         Check(_currentBasicBlock.HandlerIndex == null, VerifierError.ReturnFromHandler);
 
-        var declaredReturnType = _method.Signature.ReturnType;
+        var declaredReturnType = _method is MethodInfo ? ((MethodInfo)_method).ReturnType : typeof(void);
 
-        if (declaredReturnType.IsVoid)
+        if (declaredReturnType == typeof(void))
         {
             Debug.Assert(_stackTop >= 0);
 
@@ -2121,7 +2118,7 @@ partial class ILImporter
         }
         else
         {
-            var owningType = field.OwningType;
+            var owningType = field.DeclaringType;
 
             // Note that even if the field is static, we require that the this pointer
             // satisfy the same constraints as a non-static field  This happens to
@@ -2138,7 +2135,7 @@ partial class ILImporter
             instance = actualThis.Type;
         }
 
-        Check(_method.OwningType.CanAccess(field, instance), VerifierError.FieldAccess);
+        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
 
         Push(StackValue.CreateFromType(field.FieldType));
     }
@@ -2157,11 +2154,11 @@ partial class ILImporter
             instance = null;
 
             if (field.IsInitOnly)
-                Check(_method.IsStaticConstructor && field.OwningType == _method.OwningType, VerifierError.InitOnly);
+                Check(_method.IsStatic && _method.IsConstructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
         }
         else
         {
-            var owningType = field.OwningType;
+            var owningType = field.DeclaringType;
 
             // Note that even if the field is static, we require that the this pointer
             // satisfy the same constraints as a non-static field  This happens to
@@ -2183,7 +2180,7 @@ partial class ILImporter
             //    Check(_method.IsConstructor && field.OwningType == _method.OwningType && actualThis.IsThisPtr, VerifierError.InitOnly);
         }
 
-        Check(_method.OwningType.CanAccess(field, instance), VerifierError.FieldAccess);
+        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
 
         Push(StackValue.CreateByRef(field.FieldType, false, isPermanentHome));
     }
@@ -2230,7 +2227,7 @@ partial class ILImporter
         }
 
         // Check any constraints on the fields' class --- accessing the field might cause a class constructor to run.
-        Check(field.OwningType.CheckConstraints(), VerifierError.UnsatisfiedFieldParentInst);
+        Check(field.DeclaringType.CheckConstraints(), VerifierError.UnsatisfiedFieldParentInst);
 
         Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
 
@@ -2338,7 +2335,7 @@ partial class ILImporter
 
         Check(type.CheckConstraints(), VerifierError.UnsatisfiedBoxOperand);
 
-        Check(_method.OwningType.CanAccess(type), VerifierError.TypeAccess);
+        Check(_method.DeclaringType.CanAccess(type), VerifierError.TypeAccess);
 
         CheckIsAssignable(value, targetType);
 

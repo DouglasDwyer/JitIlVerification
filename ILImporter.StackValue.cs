@@ -22,9 +22,9 @@ struct StackValue
 
     public readonly StackValueKind Kind;
     public readonly Type Type;
-    public readonly MethodInfo Method;
+    public readonly MethodBase Method;
 
-    private StackValue(StackValueKind kind, Type type = null, MethodInfo method = null, StackValueFlags flags = StackValueFlags.None)
+    private StackValue(StackValueKind kind, Type type = null, MethodBase method = null, StackValueFlags flags = StackValueFlags.None)
     {
         this.Kind = kind;
         this.Type = type;
@@ -117,7 +117,7 @@ struct StackValue
             (permanentHome ? StackValueFlags.PermanentHome : StackValueFlags.None));
     }
 
-    static public StackValue CreateMethod(MethodInfo method)
+    static public StackValue CreateMethod(MethodBase method)
     {
         return new StackValue(StackValueKind.NativeInt, null, method);
     }
