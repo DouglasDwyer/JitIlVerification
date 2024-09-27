@@ -6,20 +6,16 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
-using Internal.TypeSystem;
-using Internal.TypeSystem.Ecma;
-
-namespace ILVerify
+namespace JitIlVerification
 {
     internal static class AccessVerificationHelpers
     {
         /// <summary>
         /// Returns whether the class <paramref name="currentClass"/> can access the class <paramref name="targetClass"/>.
         /// </summary>
-        internal static bool CanAccess(this TypeInfo currentClass, TypeInfo targetClass)
+        internal static bool CanAccess(this Type currentClass, Type targetClass)
         {
             if (targetClass.IsGenericParameter || targetClass.IsSignatureVariable)
                 return true; // Generic parameters are always accessible

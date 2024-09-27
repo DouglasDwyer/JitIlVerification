@@ -5,7 +5,8 @@ using System;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
-namespace AssemblyILVerification;
+
+namespace JitIlVerification;
 
 struct StackValue
 {

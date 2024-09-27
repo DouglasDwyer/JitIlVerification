@@ -1,10 +1,9 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using Internal.TypeSystem;
 using System;
 
-namespace AssemblyILVerification;
+namespace JitIlVerification;
 
 internal static class TypeSystemHelpers
 {
@@ -16,23 +15,20 @@ internal static class TypeSystemHelpers
         if (type == null)
             return null;
 
-        var category = type.UnderlyingType.Category;
+        var underlying = type.IsEnum ? type.GetEnumUnderlyingType() : type;
 
-        switch (category)
+        switch(Type.GetTypeCode(type))
         {
-            case TypeFlags.Byte:
-                return type.Context.GetWellKnownType(WellKnownType.SByte);
-            case TypeFlags.UInt16:
-                return type.Context.GetWellKnownType(WellKnownType.Int16);
-            case TypeFlags.UInt32:
-                return type.Context.GetWellKnownType(WellKnownType.Int32);
-            case TypeFlags.UInt64:
-                return type.Context.GetWellKnownType(WellKnownType.Int64);
-            case TypeFlags.UIntPtr:
-                return type.Context.GetWellKnownType(WellKnownType.IntPtr);
-
+            case TypeCode.Byte:
+                return typeof(sbyte);
+            case TypeCode.UInt16:
+                return typeof(sbyte);
+            case TypeCode.UInt32:
+                return typeof(sbyte);
+            case TypeCode.UInt64:
+                return typeof(sbyte);
             default:
-                return type.UnderlyingType; //Reduced type is type itself
+                return underlying;
         }
     }
 

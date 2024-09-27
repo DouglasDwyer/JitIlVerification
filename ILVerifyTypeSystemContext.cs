@@ -7,11 +7,8 @@ using System.IO;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using Internal.IL;
-using Internal.TypeSystem;
-using Internal.TypeSystem.Ecma;
 
-namespace ILVerify
+namespace JitIlVerification
 {
     class ILVerifyTypeSystemContext : MetadataTypeSystemContext
     {
