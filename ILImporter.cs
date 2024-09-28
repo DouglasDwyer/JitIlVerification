@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Linq;
+using System.Reflection;
 
 namespace JitIlVerification;
 
@@ -274,7 +275,7 @@ internal sealed partial class ILImporter
             var r = _exceptionRegions[i];
 
             CreateBasicBlock(r.ILRegion.TryOffset).TryStart = true;
-            if (r.ILRegion.Kind == ILExceptionRegionKind.Filter)
+            if (r.ILRegion.Flags == ExceptionHandlingClauseOptions.Filter)
                 CreateBasicBlock(r.ILRegion.FilterOffset).FilterStart = true;
             CreateBasicBlock(r.ILRegion.HandlerOffset).HandlerStart = true;
         }

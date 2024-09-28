@@ -35,6 +35,8 @@ partial class ILImporter
 {
     readonly MethodBase _method;
     readonly ParameterInfo[] _methodParameters;
+    readonly Type[]? _genericParameters;
+    readonly Type[]? _genericTypeParameters;
 
     readonly Type _thisType;
 
@@ -151,22 +153,9 @@ partial class ILImporter
         var instantiatedType = method.DeclaringType;
         var instantiatedMethod = method;
 
-        /*
-        if (instantiatedType.HasInstantiation)
-        {
-            Instantiation genericTypeInstantiation = InstantiatedGenericParameter.CreateGenericTypeInstantiaton(instantiatedType.Instantiation);
-            instantiatedType = _typeSystemContext.GetInstantiatedType((MetadataType)instantiatedType, genericTypeInstantiation);
-            instantiatedMethod = _typeSystemContext.GetMethodForInstantiatedType(instantiatedMethod.GetTypicalMethodDefinition(), (InstantiatedType)instantiatedType);
-        }
-
-        if (instantiatedMethod.HasInstantiation)
-        {
-            Instantiation genericMethodInstantiation = InstantiatedGenericParameter.CreateGenericMethodInstantiation(
-                instantiatedType.Instantiation, instantiatedMethod.Instantiation);
-            instantiatedMethod = _typeSystemContext.GetInstantiatedMethod(instantiatedMethod, genericMethodInstantiation);
-        }*/
-
         _method = instantiatedMethod;
+        _genericParameters = _method.IsGenericMethodDefinition ? _method.GetGenericArguments() : null;
+        _genericTypeParameters = _method.DeclaringType.IsGenericTypeDefinition ? _method.DeclaringType.GenericTypeArguments : null;
 
         _methodIL = method.GetMethodBody();
 
@@ -1258,7 +1247,7 @@ partial class ILImporter
         MemberInfo tokenObj = null;
         try
         {
-            tokenObj = _method.Module.ResolveMember(token);
+            tokenObj = _method.Module.ResolveMember(token, _genericTypeParameters, _genericParameters);
         }
         catch (BadImageFormatException)
         {
@@ -1529,8 +1518,6 @@ partial class ILImporter
 
         CheckIsObjRef(value);
 
-        Check(_method.DeclaringType.CanAccess(type), VerifierError.TypeAccess);
-
         Push(StackValue.CreateObjRef(type));
     }
 
@@ -1571,9 +1558,7 @@ partial class ILImporter
         }
         else if (opcode != ILOpcode.newobj)
         {
-            EcmaMethod ecmaMethod = method.GetTypicalMethodDefinition() as EcmaMethod;
-            if (ecmaMethod != null)
-                Check(!ecmaMethod.IsAbstract, VerifierError.CallAbstract);
+            Check(!method.IsAbstract, VerifierError.CallAbstract);
         }
 
         if (opcode == ILOpcode.newobj && methodType.IsAssignableTo(typeof(Delegate)))
@@ -1714,14 +1699,6 @@ partial class ILImporter
             }
         }
 
-        // Check any constraints on the callee's class and type parameters
-        if (!method.DeclaringType.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.DeclaringType);
-        else if (!method.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodInst, method);
-
-        Check(_method.DeclaringType.CanAccess(method, instance), VerifierError.MethodAccess);
-
         Type returnType = method is MethodInfo ? ((MethodInfo)method).ReturnType : typeof(void);
 
         // special checks for tailcalls
@@ -1829,14 +1806,6 @@ partial class ILImporter
             Debug.Fail("Unexpected ldftn opcode: " + opCode.ToString());
             return;
         }
-
-        // Check any constraints on the callee's class and type parameters
-        if (!method.DeclaringType.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodParentInst, method.DeclaringType);
-        else if (!method.CheckConstraints())
-            VerificationError(VerifierError.UnsatisfiedMethodInst, method);
-
-        Check(_method.DeclaringType.CanAccess(method, instance), VerifierError.MethodAccess);
 
         Push(StackValue.CreateMethod(method));
     }
@@ -2135,8 +2104,6 @@ partial class ILImporter
             instance = actualThis.Type;
         }
 
-        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
-
         Push(StackValue.CreateFromType(field.FieldType));
     }
 
@@ -2180,8 +2147,6 @@ partial class ILImporter
             //    Check(_method.IsConstructor && field.OwningType == _method.OwningType && actualThis.IsThisPtr, VerifierError.InitOnly);
         }
 
-        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
-
         Push(StackValue.CreateByRef(field.FieldType, false, isPermanentHome));
     }
 
@@ -2201,7 +2166,7 @@ partial class ILImporter
             instance = null;
 
             if (field.IsInitOnly)
-                Check(_method.IsStaticConstructor && field.OwningType == _method.OwningType, VerifierError.InitOnly);
+                Check(_method.IsStatic && _method.IsConstructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
         }
         else
         {
@@ -2225,11 +2190,6 @@ partial class ILImporter
                 Check(field.DeclaringType == _method.DeclaringType && actualThis.IsThisPtr &&
                     (_method.IsConstructor || HasIsExternalInit(_method)), VerifierError.InitOnly);
         }
-
-        // Check any constraints on the fields' class --- accessing the field might cause a class constructor to run.
-        Check(field.DeclaringType.CheckConstraints(), VerifierError.UnsatisfiedFieldParentInst);
-
-        Check(_method.DeclaringType.CanAccess(field, instance), VerifierError.FieldAccess);
 
         CheckIsAssignable(value, StackValue.CreateFromType(field.FieldType));
     }
@@ -2333,14 +2293,10 @@ partial class ILImporter
         Check(type.IsPrimitive || targetType.Kind == StackValueKind.ObjRef ||
             type.IsGenericParameter || type.IsValueType, VerifierError.ExpectedValClassObjRefVariable);
 
-        Check(type.CheckConstraints(), VerifierError.UnsatisfiedBoxOperand);
-
-        Check(_method.DeclaringType.CanAccess(type), VerifierError.TypeAccess);
-
         CheckIsAssignable(value, targetType);
 
         // for nullable<T> we push T
-        var typeForBox = type.IsNullable ? type.Instantiation[0] : type;
+        var typeForBox = Nullable.GetUnderlyingType(type) ?? type;
 
         // even if type is a value type we want the ref
         Push(StackValue.CreateObjRef(typeForBox));
