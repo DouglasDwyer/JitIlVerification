@@ -5,7 +5,7 @@ using System;
 
 namespace JitIlVerification;
 
-public class VerificationResult
+internal class VerificationResult
 {
     public VerifierError Code { get; internal set; }
     public RuntimeTypeHandle Type { get; internal set; }
@@ -37,7 +37,7 @@ public class VerificationResult
     }
 }
 
-public class ErrorArgument
+internal class ErrorArgument
 {
     public ErrorArgument() { }
 
@@ -49,4 +49,9 @@ public class ErrorArgument
 
     public string Name { get; }
     public object Value { get; }
+
+    public override string ToString()
+    {
+        return $"{Name}: {Value}";
+    }
 }

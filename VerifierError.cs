@@ -3,7 +3,7 @@
 
 namespace JitIlVerification;
 
-public enum VerifierError
+internal enum VerifierError
 {
     None = 0,
     //E_HRESULT           "[HRESULT 0x%08X]"

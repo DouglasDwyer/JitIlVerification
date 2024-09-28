@@ -7,8 +7,7 @@
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="System.Reflection.Metadata" Version="8.0.0" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.5" />
   </ItemGroup>
 </Project>
