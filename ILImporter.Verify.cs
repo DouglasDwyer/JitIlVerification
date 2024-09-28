@@ -256,7 +256,7 @@ partial class ILImporter
                     }
                 }
                 // Check if offset is within the range [FilterOffset, HandlerOffset[
-                if (r.FilterOffset != -1 && r.FilterOffset <= offset && offset < r.HandlerOffset)
+                if (r.Flags == ExceptionHandlingClauseOptions.Filter && r.FilterOffset <= offset && offset < r.HandlerOffset)
                 {
                     if (!basicBlock.FilterIndex.HasValue)
                     {
@@ -1113,7 +1113,7 @@ partial class ILImporter
 
     bool IsDelegateAssignable(MethodBase targetMethod, Type delegateType, Type firstArg)
     {
-        var invokeMethod = delegateType.GetMethod("Invoke", null);
+        var invokeMethod = delegateType.GetMethod("Invoke");
         if (invokeMethod == null)
             return false;
 
@@ -1249,12 +1249,14 @@ partial class ILImporter
         {
             tokenObj = _method.Module.ResolveMember(token, _genericTypeParameters, _genericParameters);
         }
-        catch (BadImageFormatException)
+        catch (BadImageFormatException e)
         {
+            Console.WriteLine($"STINKY2 {e}");
             HandleTokenResolveException(token);
         }
-        catch (ArgumentException)
+        catch (ArgumentException e)
         {
+            Console.WriteLine($"STINKY {e}");
             HandleTokenResolveException(token);
         }
         return tokenObj;
@@ -2121,7 +2123,8 @@ partial class ILImporter
             instance = null;
 
             if (field.IsInitOnly)
-                Check(_method.IsStatic && _method.IsConstructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
+                Check(_method.IsStatic && _method.MemberType == MemberTypes.Constructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
+                
         }
         else
         {
@@ -2166,7 +2169,7 @@ partial class ILImporter
             instance = null;
 
             if (field.IsInitOnly)
-                Check(_method.IsStatic && _method.IsConstructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
+                Check(_method.IsStatic && _method.MemberType == MemberTypes.Constructor && field.DeclaringType == _method.DeclaringType, VerifierError.InitOnly);
         }
         else
         {

@@ -5,11 +5,12 @@ using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace JitIlVerification;
 
@@ -122,9 +123,9 @@ public class VerifiableAssemblyLoader
     /// <param name="handle">The method to verify.</param>
     /// <exception cref="BadImageFormatException">If the method was unverifiable.</exception>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Verify(RuntimeMethodHandle handle)
+    public static void Verify(RuntimeTypeHandle type, RuntimeMethodHandle handle)
     {
-        var methodBase = MethodBase.GetMethodFromHandle(handle);
+        var methodBase = MethodBase.GetMethodFromHandle(handle, type);
         if (methodBase is null)
         {
             throw new BadImageFormatException($"Unable to find method with handle {handle} to verify.");
@@ -257,12 +258,11 @@ public class VerifiableAssemblyLoader
     protected virtual void InstrumentAssembly(AssemblyDefinition assembly)
     {
         var methods = GetAllMethods(assembly).ToArray();
-        var id = 0;
-        foreach (var method in methods)
+        for (int id = 0; id < methods.Length; id++)
         {
+            var method = methods[id];
             var guardField = CreateGuardField(method.Method, id, method.References);
             InsertGuardCall(method.Method, guardField);
-            id++;
         }
     }
 
@@ -377,15 +377,17 @@ public class VerifiableAssemblyLoader
     /// <returns>The field to access in order to provoke verification.</returns>
     private static FieldDefinition CreateGuardField(MethodDefinition method, int id, ImportedReferences references)
     {
-        var guardType = new TypeDefinition("JitIlVerification.Guard", $".MethodGuard_{id}",
+        var guardType = new TypeDefinition("JitIlVerification.Guard", $"{method.Name}_{id}",
             Mono.Cecil.TypeAttributes.Public | Mono.Cecil.TypeAttributes.Class | Mono.Cecil.TypeAttributes.AutoLayout
             | Mono.Cecil.TypeAttributes.Abstract | Mono.Cecil.TypeAttributes.Sealed, references.ObjectType);
+
         method.Module.Types.Add(guardType);
 
         var guardCctor = new MethodDefinition(".cctor", Mono.Cecil.MethodAttributes.Public | Mono.Cecil.MethodAttributes.HideBySig
             | Mono.Cecil.MethodAttributes.SpecialName | Mono.Cecil.MethodAttributes.RTSpecialName | Mono.Cecil.MethodAttributes.Static, references.VoidType);
 
         var il = guardCctor.Body.GetILProcessor();
+        il.Append(il.Create(OpCodes.Ldtoken, method.DeclaringType));
         il.Append(il.Create(OpCodes.Ldtoken, method));
         il.Append(il.Create(OpCodes.Call, references.VerifyMethod));
         il.Append(il.Create(OpCodes.Ret));
