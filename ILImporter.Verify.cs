@@ -155,7 +155,7 @@ partial class ILImporter
 
         _method = instantiatedMethod;
         _genericParameters = _method.IsGenericMethodDefinition ? _method.GetGenericArguments() : null;
-        _genericTypeParameters = _method.DeclaringType.IsGenericTypeDefinition ? _method.DeclaringType.GenericTypeArguments : null;
+        _genericTypeParameters = _method.DeclaringType.IsGenericTypeDefinition ? _method.DeclaringType.GetTypeInfo().GenericTypeParameters : null;
 
         _methodIL = method.GetMethodBody();
 
@@ -1249,14 +1249,12 @@ partial class ILImporter
         {
             tokenObj = _method.Module.ResolveMember(token, _genericTypeParameters, _genericParameters);
         }
-        catch (BadImageFormatException e)
+        catch (BadImageFormatException)
         {
-            Console.WriteLine($"STINKY2 {e}");
             HandleTokenResolveException(token);
         }
-        catch (ArgumentException e)
+        catch (ArgumentException)
         {
-            Console.WriteLine($"STINKY {e}");
             HandleTokenResolveException(token);
         }
         return tokenObj;
@@ -1684,9 +1682,11 @@ partial class ILImporter
                 // harder and more error prone.
                 if (method.IsVirtual && !method.IsFinal && !actualThis.IsBoxedValueType)
                 {
-                    var methodTypeDef = methodType.DeclaringType; // Method is always considered final if owning type is sealed
-                    if (methodTypeDef == null || !methodTypeDef.IsSealed)
+                    // Method is always considered final if owning type is sealed
+                    if (methodType == null || !methodType.IsSealed)
+                    {
                         Check(actualThis.IsThisPtr && !_modifiesThisPtr, VerifierError.ThisMismatch);
+                    }
                 }
             }
 

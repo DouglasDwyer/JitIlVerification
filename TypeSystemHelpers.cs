@@ -22,11 +22,11 @@ internal static class TypeSystemHelpers
             case TypeCode.Byte:
                 return typeof(sbyte);
             case TypeCode.UInt16:
-                return typeof(sbyte);
+                return typeof(short);
             case TypeCode.UInt32:
-                return typeof(sbyte);
+                return typeof(int);
             case TypeCode.UInt64:
-                return typeof(sbyte);
+                return typeof(long);
             default:
                 return underlying;
         }
