@@ -7,12 +7,11 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 
-namespace JitIlVerification;
+namespace Dwyer.JitIlVerification;
 
 /// <summary>
 /// Provides scoped assembly loading with the same semantics as <see cref="AssemblyLoadContext"/>.

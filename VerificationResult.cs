@@ -3,7 +3,7 @@
 
 using System;
 
-namespace JitIlVerification;
+namespace Dwyer.JitIlVerification;
 
 internal class VerificationResult
 {

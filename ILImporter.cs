@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Linq;
 using System.Reflection;
 
-namespace JitIlVerification;
+namespace Dwyer.JitIlVerification;
 
 internal sealed partial class ILImporter
 {

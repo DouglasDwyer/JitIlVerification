@@ -8,7 +8,7 @@ using System.Reflection;
 
 #pragma warning disable IDE0060
 
-namespace JitIlVerification;
+namespace Dwyer.JitIlVerification;
 
 class VerificationException : Exception
 {
