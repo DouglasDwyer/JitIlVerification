@@ -10,6 +10,8 @@ The original .NET runtime for Windows came with CIL verification. Whenever an as
 
 ### How to use this
 
+For detailed information, see [the docs](https://douglasdwyer.github.io/JitIlVerification/).
+
 `JitIlVerification` defines a single public type - the `VerifiableAssemblyLoader`. This is a drop-in replacement for a [`System.Runtime.AssemblyLoadContext`](https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-8.0), but any assemblies loaded with the `VerifiableAssemblyLoader` will be checked for invalid CIL. If an invalid method from the assembly is called, an exception will immediately be thrown.
 
 ### How it works

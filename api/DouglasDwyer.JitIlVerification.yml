@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: DouglasDwyer.JitIlVerification
+  commentId: N:DouglasDwyer.JitIlVerification
+  id: DouglasDwyer.JitIlVerification
+  children:
+  - DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader
+  langs:
+  - csharp
+  - vb
+  name: DouglasDwyer.JitIlVerification
+  nameWithType: DouglasDwyer.JitIlVerification
+  fullName: DouglasDwyer.JitIlVerification
+  type: Namespace
+  assemblies:
+  - JitIlVerification
+references:
+- uid: DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader
+  commentId: T:DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader
+  href: DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader.html
+  name: VerifiableAssemblyLoader
+  nameWithType: VerifiableAssemblyLoader
+  fullName: DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader

@@ -1,4 +1,4 @@
-﻿namespace Dwyer.JitIlVerification;
+﻿namespace DouglasDwyer.JitIlVerification;
 
 /// <summary>
 /// An enumeration of all of the operation codes that are used in the CLI Common Intermediate Language.

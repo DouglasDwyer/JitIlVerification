@@ -1,4 +1,4 @@
-﻿namespace Dwyer.JitIlVerification;
+﻿namespace DouglasDwyer.JitIlVerification;
 
 //
 // Corresponds to "I.12.3.2.1 The evaluation stack" in ECMA spec

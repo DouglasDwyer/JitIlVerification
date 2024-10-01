@@ -3,7 +3,7 @@
 
 using System;
 
-namespace Dwyer.JitIlVerification;
+namespace DouglasDwyer.JitIlVerification;
 
 internal static class TypeSystemHelpers
 {

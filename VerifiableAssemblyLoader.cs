@@ -11,7 +11,7 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 
-namespace Dwyer.JitIlVerification;
+namespace DouglasDwyer.JitIlVerification;
 
 /// <summary>
 /// Provides scoped assembly loading with the same semantics as <see cref="AssemblyLoadContext"/>.

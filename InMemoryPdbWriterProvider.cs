@@ -3,7 +3,7 @@ using Mono.Cecil.Cil;
 using System;
 using System.IO;
 
-namespace Dwyer.JitIlVerification;
+namespace DouglasDwyer.JitIlVerification;
 
 internal sealed class InMemoryPdbWriterProvider : ISymbolWriterProvider
 {

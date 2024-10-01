@@ -22,6 +22,26 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DouglasDwyer.JitIlVerification.VerifiableAssemblyLoader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DouglasDwyer.JitIlVerification.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DouglasDwyer.JitIlVerification.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/Dwyer.JitIlVerification.VerifiableAssemblyLoader.yml",
       "output": {
         ".html": {

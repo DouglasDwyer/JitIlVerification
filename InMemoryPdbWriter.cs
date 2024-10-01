@@ -2,7 +2,7 @@
 using System.IO;
 using System.IO.Compression;
 
-namespace Dwyer.JitIlVerification;
+namespace DouglasDwyer.JitIlVerification;
 
 internal sealed class InMemoryPdbWriter : ISymbolWriter
 {

@@ -77,6 +77,7 @@
 <h3 id="why-use-this">Why use this</h3>
 <p>The original .NET runtime for Windows came with CIL verification. Whenever an assembly was loaded, if the assembly had partial/low trust (because it was loaded from an untrusted source, like the web) the runtime would verify the assembly to ensure that its CIL was valid. In .NET Core, however, <a href="https://github.com/dotnet/runtime/issues/32648">this functionality has been removed</a>. The .NET Core runtime will accept and load invalid or unsafe CIL. This makes it impossible to sandbox C# assemblies or load code from an untrusted source, since that code could have undefined behavior. This library re-adds runtime CIL verification.</p>
 <h3 id="how-to-use-this">How to use this</h3>
+<p>For detailed information, see <a href="https://douglasdwyer.github.io/JitIlVerification/">the docs</a>.</p>
 <p><code>JitIlVerification</code> defines a single public type - the <code>VerifiableAssemblyLoader</code>. This is a drop-in replacement for a <a href="https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-8.0"><code>System.Runtime.AssemblyLoadContext</code></a>, but any assemblies loaded with the <code>VerifiableAssemblyLoader</code> will be checked for invalid CIL. If an invalid method from the assembly is called, an exception will immediately be thrown.</p>
 <h3 id="how-it-works">How it works</h3>
 <ul>

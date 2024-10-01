@@ -2,7 +2,7 @@
 using System.Buffers.Binary;
 using System.Reflection;
 
-namespace Dwyer.JitIlVerification;
+namespace DouglasDwyer.JitIlVerification;
 
 internal sealed partial class ILImporter
 {
