@@ -1,0 +1,8 @@
+### YamlMime:TableOfContent
+items:
+- uid: Dwyer.JitIlVerification
+  name: Dwyer.JitIlVerification
+  items:
+  - uid: Dwyer.JitIlVerification.VerifiableAssemblyLoader
+    name: VerifiableAssemblyLoader
+memberLayout: SamePage

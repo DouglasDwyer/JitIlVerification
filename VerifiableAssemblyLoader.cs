@@ -102,6 +102,7 @@ public class VerifiableAssemblyLoader
     /// Initializes a new instance of the <see cref="VerifiableAssemblyLoader"/> class
     /// with a value that indicates whether unloading is enabled.
     /// </summary>
+    /// <param name="isCollectible">Whether this context should be able to unload.</param>
     public VerifiableAssemblyLoader(bool isCollectible)
     {
         _loader = new VerifiableAssemblyLoadContext(this, isCollectible);
@@ -111,6 +112,8 @@ public class VerifiableAssemblyLoader
     /// Initializes a new instance of the <see cref="VerifiableAssemblyLoader"/> class
     /// with a name and a value that indicates whether unloading is enabled.
     /// </summary>
+    /// <param name="name">The display name of the load context.</param>
+    /// <param name="isCollectible">Whether this context should be able to unload.</param>
     public VerifiableAssemblyLoader(string name, bool isCollectible)
     {
         _loader = new VerifiableAssemblyLoadContext(this, name, isCollectible);

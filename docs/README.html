@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>JitIlVerification | JitIlVerification </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="JitIlVerification | JitIlVerification ">
+    
+    
+      <link rel="shortcut icon" href="favicon.ico">
+      <link rel="stylesheet" href="styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="styles/docfx.css">
+      <link rel="stylesheet" href="styles/main.css">
+      <meta property="docfx:navrel" content="toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="index.html">
+                <img id="logo" class="svg" src="logo.svg" alt="JitIlVerification">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        <div class="article row grid">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="jitilverification">JitIlVerification</h1>
+
+<p>This project implements the verification of .NET assemblies at runtime. Verified assemblies are guaranteed to have valid Common Intermediate Language (CIL) bytecode, and cannot directly cause memory unsafety or undefined behavior.</p>
+<p>This project is a fork of the <a href="https://github.com/dotnet/runtime/tree/main/src/coreclr/tools/ILVerify">Microsoft.ILVerification</a> library, which verifies assemblies by loading them (and all of their dependencies) from disk. The original library functions mainly as a compile-time static analysis tool. It is unsuited for verification of assemblies that a deployed application is loading, because the system libraries or other dependencies may not be known or available on disk. The main contribution of <code>JitIlVerification</code> is to integrate Microsoft's verification library with the C# runtime type system, so that assembly validation can occur at runtime.</p>
+<h3 id="why-use-this">Why use this</h3>
+<p>The original .NET runtime for Windows came with CIL verification. Whenever an assembly was loaded, if the assembly had partial/low trust (because it was loaded from an untrusted source, like the web) the runtime would verify the assembly to ensure that its CIL was valid. In .NET Core, however, <a href="https://github.com/dotnet/runtime/issues/32648">this functionality has been removed</a>. The .NET Core runtime will accept and load invalid or unsafe CIL. This makes it impossible to sandbox C# assemblies or load code from an untrusted source, since that code could have undefined behavior. This library re-adds runtime CIL verification.</p>
+<h3 id="how-to-use-this">How to use this</h3>
+<p><code>JitIlVerification</code> defines a single public type - the <code>VerifiableAssemblyLoader</code>. This is a drop-in replacement for a <a href="https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-8.0"><code>System.Runtime.AssemblyLoadContext</code></a>, but any assemblies loaded with the <code>VerifiableAssemblyLoader</code> will be checked for invalid CIL. If an invalid method from the assembly is called, an exception will immediately be thrown.</p>
+<h3 id="how-it-works">How it works</h3>
+<ul>
+<li>Whenever an assembly is loaded with <code>VerifiableAssemblyLoader</code>, the assembly bytecode is modified using <code>Mono.Cecil</code>. Guard instructions are inserted at the beginning of every CIL method.</li>
+<li>The assembly is loaded normally by the .NET Core runtime.</li>
+<li>When one of the guard instructions is hit for the first time, it passes the declaring method handle to the <code>ILVerification</code> algorithm. The algorithm loads the method bytecode using reflection and verifies it using the runtime type system.</li>
+<li>If the method was verifiable, then it will run successfully. Otherwise, any attempt to call the method will throw an exception.</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/DouglasDwyer/JitIlVerification/blob/main/README.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="styles/docfx.js"></script>
+    <script type="text/javascript" src="styles/main.js"></script>
+  </body>
+</html>
