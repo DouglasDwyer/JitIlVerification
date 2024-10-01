@@ -11,3 +11,10 @@ The original .NET runtime for Windows came with CIL verification. Whenever an as
 ### How to use this
 
 `JitIlVerification` defines a single public type - the `VerifiableAssemblyLoader`. This is a drop-in replacement for a [`System.Runtime.AssemblyLoadContext`](https://learn.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext?view=net-8.0), but any assemblies loaded with the `VerifiableAssemblyLoader` will be checked for invalid CIL. If an invalid method from the assembly is called, an exception will immediately be thrown.
+
+### How it works
+
+- Whenever an assembly is loaded with `VerifiableAssemblyLoader`, the assembly bytecode is modified using `Mono.Cecil`. Guard instructions are inserted at the beginning of every CIL method.
+- The assembly is loaded normally by the .NET Core runtime.
+- When one of the guard instructions is hit for the first time, it passes the declaring method handle to the `ILVerification` algorithm. The algorithm loads the method bytecode using reflection and verifies it using the runtime type system.
+- If the method was verifiable, then it will run successfully. Otherwise, any attempt to call the method will throw an exception.

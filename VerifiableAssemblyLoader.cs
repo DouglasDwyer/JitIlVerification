@@ -207,8 +207,6 @@ public class VerifiableAssemblyLoader
         InstrumentAssembly(assyDef);
         StoreAssemblyDefinition(assyDef, ref output);
 
-        File.WriteAllBytes("otherimpl.dll", output.ToArray());
-
         return _loader.LoadFromStream(output);
     }
 
