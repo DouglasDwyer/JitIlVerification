@@ -1,5 +1,7 @@
 # JitIlVerification
 
+[![NuGet version (DouglasDwyer.JitIlVerification)](https://img.shields.io/nuget/v/DouglasDwyer.JitIlVerification.svg?style=flat-square)](https://www.nuget.org/packages/DouglasDwyer.JitIlVerification/)
+
 This project implements the verification of .NET assemblies at runtime. Verified assemblies are guaranteed to have valid Common Intermediate Language (CIL) bytecode, and cannot directly cause memory unsafety or undefined behavior. 
 
 This project is a fork of the [Microsoft.ILVerification](https://github.com/dotnet/runtime/tree/main/src/coreclr/tools/ILVerify) library, which verifies assemblies by loading them (and all of their dependencies) from disk. The original library functions mainly as a compile-time static analysis tool. It is unsuited for verification of assemblies that a deployed application is loading, because the system libraries or other dependencies may not be known or available on disk. The main contribution of `JitIlVerification` is to integrate Microsoft's verification library with the C# runtime type system, so that assembly validation can occur at runtime.
