@@ -191,7 +191,7 @@ public class VerifiableAssemblyLoader
     /// <param name="assembly">A byte array that is a COFF-based image containing a managed assembly.</param>
     /// <param name="assemblySymbols">A byte array that contains the raw bytes representing the symbols for the assembly.</param>
     /// <returns>The loaded assembly.</returns>
-    public Assembly LoadFromStream(Stream assembly, Stream? assemblySymbols)
+    public virtual Assembly LoadFromStream(Stream assembly, Stream? assemblySymbols)
     {
         MemoryStream output;
         if (assembly is MemoryStream inputStream)
