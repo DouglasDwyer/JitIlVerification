@@ -65,6 +65,11 @@ internal sealed class InMemoryPdbWriter : ISymbolWriter
         _writer.Write();
     }
 
+    public void Write(ICustomDebugInformationProvider provider)
+    {
+        _writer.Write(provider);
+    }
+
     public void Dispose()
     {
         _writer.Dispose();
