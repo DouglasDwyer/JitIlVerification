@@ -288,6 +288,15 @@ partial class ILImporter
     // Used to merge stack states.
     static Type MergeObjectReferences(Type classA, Type classB)
     {
+        if (classA.IsAssignableTo(classB))
+        {
+            return classB;
+        }    
+        else if (classB.IsAssignableTo(classA))
+        {
+            return classA;
+        }
+
         if (classA == classB)
             return classA;
 
