@@ -35,8 +35,8 @@ partial class ILImporter
 {
     readonly MethodBase _method;
     readonly ParameterInfo[] _methodParameters;
-    readonly Type[]? _genericParameters;
-    readonly Type[]? _genericTypeParameters;
+    readonly Type[] _genericParameters;
+    readonly Type[] _genericTypeParameters;
 
     readonly Type _thisType;
 
@@ -2202,7 +2202,7 @@ partial class ILImporter
         ImportLoadIndirect(ResolveTypeToken(token));
     }
 
-    void ImportLoadIndirect(Type? type)
+    void ImportLoadIndirect(Type type)
     {
         ClearPendingPrefix(Prefix.Unaligned);
         ClearPendingPrefix(Prefix.Volatile);

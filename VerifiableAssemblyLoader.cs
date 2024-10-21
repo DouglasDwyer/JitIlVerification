@@ -122,6 +122,7 @@ public class VerifiableAssemblyLoader
     /// <summary>
     /// Invokes the CIL verifier for the given loaded method.
     /// </summary>
+    /// <param name="type">The declaring type of the method.</param>
     /// <param name="handle">The method to verify.</param>
     /// <exception cref="BadImageFormatException">If the method was unverifiable.</exception>
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -202,13 +203,14 @@ public class VerifiableAssemblyLoader
         {
             output = new MemoryStream();
             assembly.CopyTo(output);
-            assembly = output;
-            assembly.Position = 0;
+            assembly.Dispose();
+            output.Position = 0;
         }
 
         var assyDef = LoadAssemblyDefinition(output, assemblySymbols);
         InstrumentAssembly(assyDef);
         StoreAssemblyDefinition(assyDef, ref output);
+        assyDef.Dispose();
 
         return _loader.LoadFromStream(output);
     }
@@ -218,10 +220,28 @@ public class VerifiableAssemblyLoader
     /// </summary>
     /// <param name="assemblyPath">The fully qualified path of the file to load.</param>
     /// <returns>The loaded assembly.</returns>
+    /// <exception cref="ArgumentException">
+    /// The <paramref name="assemblyPath"/> argument is not an absolute path.
+    /// </exception>
     public Assembly LoadFromAssemblyPath(string assemblyPath)
     {
+        if (!Path.IsPathFullyQualified(assemblyPath))
+        {
+            throw new ArgumentException("assemblyPath was not an absolute path.");
+        }
+
         using var stream = File.OpenRead(assemblyPath);
-        return LoadFromStream(stream);
+        var fileName = Path.GetFileNameWithoutExtension(assemblyPath);
+        var pdbPath = Path.Join(Path.GetDirectoryName(assemblyPath), $"{fileName}.pdb");
+
+        if (File.Exists(pdbPath))
+        {
+            return LoadFromStream(stream, File.OpenRead(pdbPath));
+        }
+        else
+        {
+            return LoadFromStream(stream);
+        }
     }
 
     /// <summary>
@@ -494,7 +514,7 @@ public class VerifiableAssemblyLoader
         /// <summary>
         /// Allows derived class to load an unmanaged library by name.
         /// </summary>
-        /// <param name="unmanagedDllName">Name of the unmanaged library. Typically this is the filename without its path or extensions.</param>
+        /// <param name="unmanagedDllPath">Name of the unmanaged library. Typically this is the filename without its path or extensions.</param>
         /// <returns>A handle to the loaded library, or <see cref="IntPtr.Zero"/>.</returns>
         public new IntPtr LoadUnmanagedDllFromPath(string unmanagedDllPath)
         {
@@ -544,22 +564,22 @@ public class VerifiableAssemblyLoader
     private class ImportedReferences
     {
         /// <summary>
-        /// The <see cref="bool"> type.
+        /// The <see cref="bool"/> type.
         /// </summary>
         public required TypeReference BoolType;
 
         /// <summary>
-        /// The <see cref="object"> type.
+        /// The <see cref="object"/> type.
         /// </summary>
         public required TypeReference ObjectType;
 
         /// <summary>
-        /// The <see cref="Verify(RuntimeMethodHandle)"> method.
+        /// The <see cref="Verify"/> method.
         /// </summary>
         public required MethodReference VerifyMethod;
 
         /// <summary>
-        /// The <see cref="void"> type.
+        /// The <see cref="void"/> type.
         /// </summary>
         public required TypeReference VoidType;
     }
