@@ -10,6 +10,7 @@ using System.Linq;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DouglasDwyer.JitIlVerification;
 
@@ -194,25 +195,15 @@ public class VerifiableAssemblyLoader
     /// <returns>The loaded assembly.</returns>
     public virtual Assembly LoadFromStream(Stream assembly, Stream? assemblySymbols)
     {
-        MemoryStream output;
-        if (assembly is MemoryStream inputStream)
-        {
-            output = inputStream;
-        }
-        else
-        {
-            output = new MemoryStream();
-            assembly.CopyTo(output);
-            assembly.Dispose();
-            output.Position = 0;
-        }
+        var assemblyMemoryStream = MakeMemoryStream(assembly);
+        var symbolsMemoryStream = MakeMemoryStream(assemblySymbols);
 
-        var assyDef = LoadAssemblyDefinition(output, assemblySymbols);
+        var assyDef = LoadAssemblyDefinition(assemblyMemoryStream, symbolsMemoryStream);
         InstrumentAssembly(assyDef);
-        StoreAssemblyDefinition(assyDef, ref output);
+        StoreAssemblyDefinition(assyDef, ref assemblyMemoryStream);
         assyDef.Dispose();
 
-        return _loader.LoadFromStream(output);
+        return _loader.LoadFromStream(assemblyMemoryStream);
     }
 
     /// <summary>
@@ -312,7 +303,7 @@ public class VerifiableAssemblyLoader
     /// <param name="assembly">A stream containing the assembly to load.</param>
     /// <param name="assemblySymbols">The debug symbols associated with the assembly, if any.</param>
     /// <returns>The loaded assembly definition.</returns>
-    private static AssemblyDefinition LoadAssemblyDefinition(MemoryStream assembly, Stream? assemblySymbols)
+    private static AssemblyDefinition LoadAssemblyDefinition(MemoryStream assembly, MemoryStream? assemblySymbols)
     {
         AssemblyDefinition? assyDef = null;
 
@@ -329,6 +320,9 @@ public class VerifiableAssemblyLoader
         catch
         {
             // Assume that there was an error loading symbols; try again without them.
+            var readerParameters = new ReaderParameters();
+            readerParameters.ReadSymbols = true;
+
             assembly.Position = initialPosition;
             assyDef = AssemblyDefinition.ReadAssembly(assembly);
         }
@@ -469,6 +463,34 @@ public class VerifiableAssemblyLoader
             VerifyMethod = module.ImportReference(typeof(VerifiableAssemblyLoader).GetMethod(nameof(Verify))),
             VoidType = module.ImportReference(typeof(void))
         };
+    }
+
+    /// <summary>
+    /// Returns a <see cref="MemoryStream"/> with the same contents as <paramref name="stream"/>.
+    /// If stream was already a <see cref="MemoryStream"/>, then returns without copying.
+    /// Otherwise, consumes <paramref name="stream"/> to the end.
+    /// </summary>
+    /// <param name="stream">The source stream.</param>
+    /// <returns>A seekable memory stream with the same data.</returns>
+    [return: NotNullIfNotNull(nameof(stream))]
+    private static MemoryStream? MakeMemoryStream(Stream? stream)
+    {
+        if (stream is MemoryStream output)
+        {
+            return output;
+        }
+        else if (stream is null)
+        {
+            return null;
+        }
+        else
+        {
+            output = new MemoryStream();
+            stream.CopyTo(output);
+            stream.Dispose();
+            output.Position = 0;
+            return output;
+        }
     }
 
     /// <summary>
